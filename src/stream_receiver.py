@@ -9,6 +9,10 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 
 from message_buffer import MessageBuffer
+from data_validator import DataValidator
+from outlier_filter import OutlierFilter
+from missing_data_handler import MissingDataHandler
+from resampler import Resampler
 
 
 # Параметри MQTT-брокера
@@ -41,9 +45,15 @@ incoming_queue = queue.Queue()
 
 stop_event = threading.Event()
 
+# Ініціалізація компонентів конвеєра
 message_buffer = MessageBuffer(
     reorder_window=REORDER_WINDOW
 )
+
+data_validator = DataValidator()
+outlier_filter = OutlierFilter()
+missing_data_handler = MissingDataHandler()
+resampler = Resampler()
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -65,7 +75,6 @@ def on_connect(client, userdata, flags, reason_code, properties):
 def on_message(client, userdata, message):
     """Отримання MQTT-повідомлення."""
 
-    # Окреме оброблення статусу джерела
     if message.topic == STATUS_TOPIC:
         try:
             status = message.payload.decode("utf-8")
@@ -86,7 +95,6 @@ def on_message(client, userdata, message):
         return
 
     try:
-        # Декодування JSON
         payload = message.payload.decode("utf-8")
         data = json.loads(payload)
 
@@ -95,7 +103,6 @@ def on_message(client, userdata, message):
                 "Повідомлення має бути JSON-об'єктом"
             )
 
-        # Отримання часової мітки генерації
         if not isinstance(data.get("timestamp"), str):
             raise ValueError(
                 "Відсутня коректна часова мітка timestamp"
@@ -112,7 +119,6 @@ def on_message(client, userdata, message):
 
         timestamp = timestamp.astimezone(timezone.utc)
 
-        # Фіксація часу отримання повідомлення
         received_at = datetime.now(timezone.utc)
 
         item = {
@@ -123,7 +129,6 @@ def on_message(client, userdata, message):
             "received_monotonic": time.monotonic()
         }
 
-        # Передавання повідомлення до черги
         incoming_queue.put(item)
 
     except (
@@ -143,41 +148,99 @@ def on_message(client, userdata, message):
 
 
 def process_message(item):
-    """Передавання впорядкованого повідомлення далі."""
+    """Попереднє оброблення впорядкованого повідомлення."""
 
-    data = dict(item["data"])
+    data = item["data"]
+    timestamp = item["parsed_timestamp"]
+    topic = item["topic"]
 
-    # Додавання часу отримання
-    data["received_at"] = item["received_at"]
-
-    print(f"\n[ОТРИМАНО] {item['topic']}")
-
-    print(
-        json.dumps(
-            data,
-            ensure_ascii=False,
-            indent=2
+    # Запізнілі повідомлення не змінюють актуальний стан.
+    if item["late"]:
+        logging.warning(
+            "Пропущено запізніле повідомлення: topic=%s",
+            topic
         )
+        return
+
+    # Етап 1. Валідація повідомлення.
+    valid, reason = data_validator.validate(
+        data,
+        topic
     )
 
-    if item["late"]:
-        print("[УВАГА] Повідомлення надійшло із запізненням.")
+    if not valid:
+        print(f"[ПОМИЛКА ВАЛІДАЦІЇ] {reason}")
+
+        logging.warning(
+            "Відхилено повідомлення: topic=%s | reason=%s",
+            topic,
+            reason
+        )
+        return
+
+    # Етап 2. Виявлення аномальних вимірювань.
+    accepted, reason = outlier_filter.check(
+        data,
+        timestamp
+    )
+
+    if not accepted:
+        print(f"[ВИКИД] {data['sensor_id']}: {reason}")
+
+        logging.warning(
+            "Відхилено викид: sensor=%s | reason=%s",
+            data["sensor_id"],
+            reason
+        )
+        return
+
+    # Етап 3. Оновлення останнього достовірного значення.
+    missing_data_handler.update(
+        data,
+        timestamp
+    )
 
     logging.info(
-        "topic=%s | late=%s | data=%s",
-        item["topic"],
-        item["late"],
-        json.dumps(data, ensure_ascii=False)
+        "Прийнято та оброблено: sensor=%s | value=%s",
+        data["sensor_id"],
+        data["value"]
+    )
+
+
+def emit_resampled_data():
+    """Формування узгодженого набору даних із частотою 10 Гц."""
+
+    sample = resampler.resample(
+        missing_data_handler
+    )
+
+    telemetry = sample["telemetry"]
+
+    # Короткий вивід основних показників у консоль.
+    speed = telemetry["SIG_VEL_01"]["value"]
+    temperature = telemetry["SIG_TMP_05"]["value"]
+    soc = telemetry["SIG_SOC_06"]["value"]
+
+    print(
+        f"[ЗРІЗ 10 Гц] "
+        f"Швидкість: {speed} км/год | "
+        f"Температура: {temperature} °C | "
+        f"SoC: {soc} %"
+    )
+
+    logging.info(
+        "resampled_state=%s",
+        json.dumps(sample, ensure_ascii=False)
     )
 
 
 def processing_worker():
-    """Оброблення черги та впорядкування повідомлень."""
+    """Оброблення черги, буфера та формування узгоджених даних."""
 
     while not stop_event.is_set() or not incoming_queue.empty():
 
         try:
-            item = incoming_queue.get(timeout=0.1)
+            item = incoming_queue.get(timeout=0.05)
 
             try:
                 message_buffer.add(item)
@@ -187,12 +250,20 @@ def processing_worker():
         except queue.Empty:
             pass
 
+        # Передавання готових повідомлень із буфера.
         for item in message_buffer.get_ready():
             process_message(item)
 
-    # Передавання решти повідомлень із буфера
+        # Формування узгодженого набору кожні 0,1 секунди.
+        if resampler.is_due():
+            emit_resampled_data()
+
+    # Оброблення повідомлень, що залишилися в буфері.
     for item in message_buffer.get_ready(force=True):
         process_message(item)
+
+    # Фінальний зріз після завершення приймання.
+    emit_resampled_data()
 
 
 def main():
@@ -210,7 +281,7 @@ def main():
         daemon=True
     )
 
-    print("Запуск компонента приймання телеметрії...")
+    print("Запуск конвеєра оброблення телеметрії...")
 
     worker.start()
 
@@ -236,7 +307,7 @@ def main():
         stop_event.set()
         worker.join()
 
-        print("Компонент приймання завершив роботу.")
+        print("Конвеєр оброблення завершив роботу.")
 
 
 if __name__ == "__main__":
