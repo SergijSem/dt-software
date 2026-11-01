@@ -13,6 +13,7 @@ from data_validator import DataValidator
 from outlier_filter import OutlierFilter
 from missing_data_handler import MissingDataHandler
 from resampler import Resampler
+from state_synchronizer import StateSynchronizer
 
 
 # Параметри MQTT-брокера
@@ -45,6 +46,7 @@ incoming_queue = queue.Queue()
 
 stop_event = threading.Event()
 
+
 # Ініціалізація компонентів конвеєра
 message_buffer = MessageBuffer(
     reorder_window=REORDER_WINDOW
@@ -54,6 +56,7 @@ data_validator = DataValidator()
 outlier_filter = OutlierFilter()
 missing_data_handler = MissingDataHandler()
 resampler = Resampler()
+state_synchronizer = StateSynchronizer()
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -148,7 +151,7 @@ def on_message(client, userdata, message):
 
 
 def process_message(item):
-    """Попереднє оброблення впорядкованого повідомлення."""
+    """Попереднє оброблення та перевірка правил синхронізації."""
 
     data = item["data"]
     timestamp = item["parsed_timestamp"]
@@ -200,6 +203,17 @@ def process_message(item):
         timestamp
     )
 
+    # Отримання актуального зрізу телеметрії.
+    snapshot = missing_data_handler.get_snapshot(
+        datetime.now(timezone.utc)
+    )
+
+    # Етап 4. Перевірка синхронізації за подією або порогом.
+    state_synchronizer.check_message(
+        data,
+        snapshot
+    )
+
     logging.info(
         "Прийнято та оброблено: sensor=%s | value=%s",
         data["sensor_id"],
@@ -235,7 +249,7 @@ def emit_resampled_data():
 
 
 def processing_worker():
-    """Оброблення черги, буфера та формування узгоджених даних."""
+    """Оброблення черги, буфера та синхронізація стану."""
 
     while not stop_event.is_set() or not incoming_queue.empty():
 
@@ -253,6 +267,14 @@ def processing_worker():
         # Передавання готових повідомлень із буфера.
         for item in message_buffer.get_ready():
             process_message(item)
+
+        # Отримання актуального зрізу телеметрії.
+        snapshot = missing_data_handler.get_snapshot(
+            datetime.now(timezone.utc)
+        )
+
+        # Етап 5. Періодична синхронізація стану.
+        state_synchronizer.check_periodic(snapshot)
 
         # Формування узгодженого набору кожні 0,1 секунди.
         if resampler.is_due():
