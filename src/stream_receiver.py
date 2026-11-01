@@ -13,6 +13,7 @@ from data_validator import DataValidator
 from outlier_filter import OutlierFilter
 from missing_data_handler import MissingDataHandler
 from resampler import Resampler
+from state_manager import StateManager
 from state_synchronizer import StateSynchronizer
 
 
@@ -56,7 +57,32 @@ data_validator = DataValidator()
 outlier_filter = OutlierFilter()
 missing_data_handler = MissingDataHandler()
 resampler = Resampler()
-state_synchronizer = StateSynchronizer()
+
+# Менеджер актуального стану цифрового двійника
+state_manager = StateManager()
+
+# Компонент синхронізації
+state_synchronizer = StateSynchronizer(
+    state_manager
+)
+
+
+def interface_subscriber(state):
+    """Імітація підписника інтерфейсу."""
+
+    print(
+        "[SUBSCRIBER: INTERFACE] "
+        "Отримано оновлення стану цифрового двійника."
+    )
+
+
+def analytics_subscriber(state):
+    """Імітація підписника аналітичного модуля."""
+
+    print(
+        "[SUBSCRIBER: ANALYTICS] "
+        "Отримано оновлення для аналізу телеметрії."
+    )
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -304,6 +330,17 @@ def main():
     )
 
     print("Запуск конвеєра оброблення телеметрії...")
+
+    # Реєстрація підписників.
+    state_manager.subscribe(
+        "interface",
+        interface_subscriber
+    )
+
+    state_manager.subscribe(
+        "analytics",
+        analytics_subscriber
+    )
 
     worker.start()
 

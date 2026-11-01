@@ -27,7 +27,9 @@ class StateSynchronizer:
         "SIG_LCK_08"
     }
 
-    def __init__(self):
+    def __init__(self, state_manager):
+
+        self.state_manager = state_manager
 
         self.last_periodic_sync = time.monotonic()
 
@@ -54,6 +56,9 @@ class StateSynchronizer:
 
         # Збереження поточного синхронізованого стану
         self.current_state = state
+
+        # Передавання нового стану до менеджера
+        self.state_manager.update_state(state)
 
         # Запам'ятовування значень, використаних для синхронізації
         for sensor_id, measurement in snapshot.items():
