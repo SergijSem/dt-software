@@ -49,6 +49,11 @@ logging.basicConfig(
 incoming_queue = queue.Queue()
 
 stop_event = threading.Event()
+connected_event = threading.Event()
+
+# Лічильник отриманих повідомлень
+received_messages = 0
+received_lock = threading.Lock()
 
 
 # Ініціалізація компонентів конвеєра
@@ -105,12 +110,16 @@ def on_connect(client, userdata, flags, reason_code, properties):
         print(f"Підписка на телеметрію: {TOPIC}")
         print(f"Підписка на стан джерела: {STATUS_TOPIC}\n")
 
+        connected_event.set()
+
     else:
         print(f"Помилка підключення: {reason_code}")
 
 
 def on_message(client, userdata, message):
     """Отримання MQTT-повідомлення."""
+
+    global received_messages
 
     if message.topic == STATUS_TOPIC:
         try:
@@ -130,6 +139,11 @@ def on_message(client, userdata, message):
             )
 
         return
+
+    # Рахуємо отримані телеметричні повідомлення.
+    # Статусні повідомлення до цього лічильника не входять.
+    with received_lock:
+        received_messages += 1
 
     try:
         payload = message.payload.decode("utf-8")
@@ -255,7 +269,6 @@ def process_message(item):
     )
 
     # Реєстрація успішно обробленого повідомлення.
-    # У звичайному режимі монітор ігнорує цей виклик.
     performance_monitor.record_processed_message()
 
     logging.info(
@@ -332,7 +345,6 @@ def processing_worker():
 
 
 def main():
-
     parser = argparse.ArgumentParser(
         description="Конвеєр оброблення телеметрії електроскутера"
     )
@@ -343,7 +355,17 @@ def main():
         help="Увімкнути вимірювання продуктивності"
     )
 
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=60,
+        help="Тривалість роботи конвеєра у секундах"
+    )
+
     args = parser.parse_args()
+
+    if args.duration <= 0:
+        parser.error("--duration має бути більшим за 0")
 
     measure_performance = args.measure
 
@@ -360,12 +382,10 @@ def main():
         daemon=True
     )
 
-    print("Запуск конвеєра оброблення телеметрії...")
-
-    if measure_performance:
-        print("Режим: вимірювання продуктивності.")
-    else:
-        print("Режим: звичайна робота.")
+    print("Запуск конвеєра оброблення телеметрії...", flush=True)
+    print("Режим: вимірювання продуктивності." if measure_performance
+          else "Режим: звичайна робота.", flush=True)
+    print(f"Тривалість роботи: {args.duration:.1f} с", flush=True)
 
     try:
         # Підключення до InfluxDB.
@@ -396,30 +416,75 @@ def main():
             keepalive=MQTT_KEEPALIVE
         )
 
-        # Початок вимірювання лише в спеціальному режимі.
+        client.loop_start()
+
+        # Очікування успішного підключення та підписки.
+        if not connected_event.wait(timeout=15):
+            raise TimeoutError(
+                "Не вдалося підключитися до MQTT-брокера за 15 секунд"
+            )
+
+        # Початок вимірювання після підключення.
         if measure_performance:
             performance_monitor.start()
 
-        client.loop_forever()
+        print(
+            f"Приймання телеметрії протягом "
+            f"{args.duration:.1f} с розпочато.",
+            flush=True
+        )
+
+        # Відлік часу починається після підключення до брокера.
+        end_time = time.monotonic() + args.duration
+
+        while time.monotonic() < end_time:
+            time.sleep(min(0.1, max(0, end_time - time.monotonic())))
 
     except KeyboardInterrupt:
-        print("\nПриймання телеметрії зупинено.")
+        print("\nПриймання телеметрії достроково зупинено.")
 
-    except (OSError, ValueError) as error:
-        print(f"Помилка підключення: {error}")
+    except (OSError, ValueError, TimeoutError) as error:
+        print(f"Помилка роботи конвеєра: {error}")
 
     finally:
+        # Спочатку припиняємо приймання нових повідомлень.
         if client.is_connected():
             client.disconnect()
 
+        client.loop_stop()
+
+        # Даємо worker завершити оброблення черги та буфера.
         stop_event.set()
 
         if worker.is_alive():
             worker.join()
 
         # Завершення вимірювання після оброблення черги.
+        performance_results = None
+
         if measure_performance:
-            performance_monitor.stop()
+            performance_results = performance_monitor.stop()
+
+        with received_lock:
+            total_received = received_messages
+
+        print("\n" + "=" * 55)
+        print("СТАТИСТИКА ПІДПИСНИКА")
+        print("=" * 55)
+        print(f"Отримано повідомлень: {total_received}")
+
+        if performance_results:
+            print(
+                "Оброблено повідомлень: "
+                f"{performance_results['processed_messages']}"
+            )
+
+        print("=" * 55 + "\n")
+
+        logging.info(
+            "receiver_results | received=%d",
+            total_received
+        )
 
         # Закриття з'єднання з InfluxDB.
         database_manager.close()
