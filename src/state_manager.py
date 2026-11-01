@@ -2,14 +2,18 @@ import copy
 import logging
 import threading
 
+from datetime import datetime, timezone
+
 
 class StateManager:
     """Керування актуальним станом цифрового двійника."""
 
-    def __init__(self):
+    def __init__(self, performance_monitor=None):
         self.current_state = None
         self.subscribers = {}
         self.lock = threading.RLock()
+
+        self.performance_monitor = performance_monitor
 
     def subscribe(self, name, callback):
         """Реєстрація підписника."""
@@ -39,13 +43,25 @@ class StateManager:
 
         with self.lock:
             self.current_state = copy.deepcopy(new_state)
+
+            # Фіксація фактичного моменту оновлення стану.
+            update_time = datetime.now(timezone.utc)
+
             updated_state = copy.deepcopy(self.current_state)
             subscribers = list(self.subscribers.items())
+
+        # Вимірювання затримки оновлення стану.
+        if self.performance_monitor is not None:
+            self.performance_monitor.record_state_update(
+                updated_state,
+                update_time
+            )
 
         logging.info(
             "Актуальний стан цифрового двійника оновлено."
         )
 
+        # Сповіщення зареєстрованих підписників.
         for name, callback in subscribers:
             try:
                 callback(copy.deepcopy(updated_state))

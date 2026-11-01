@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import queue
@@ -16,6 +17,7 @@ from resampler import Resampler
 from state_manager import StateManager
 from state_synchronizer import StateSynchronizer
 from database_manager import database_manager
+from performance_monitor import PerformanceMonitor
 
 
 # Параметри MQTT-брокера
@@ -59,8 +61,13 @@ outlier_filter = OutlierFilter()
 missing_data_handler = MissingDataHandler()
 resampler = Resampler()
 
+# Компонент вимірювання продуктивності
+performance_monitor = PerformanceMonitor()
+
 # Менеджер актуального стану цифрового двійника
-state_manager = StateManager()
+state_manager = StateManager(
+    performance_monitor=performance_monitor
+)
 
 # Компонент синхронізації
 state_synchronizer = StateSynchronizer(
@@ -247,6 +254,10 @@ def process_message(item):
         snapshot
     )
 
+    # Реєстрація успішно обробленого повідомлення.
+    # У звичайному режимі монітор ігнорує цей виклик.
+    performance_monitor.record_processed_message()
+
     logging.info(
         "Прийнято та оброблено: sensor=%s | value=%s",
         data["sensor_id"],
@@ -263,7 +274,6 @@ def emit_resampled_data():
 
     telemetry = sample["telemetry"]
 
-    # Короткий вивід основних показників у консоль.
     speed = telemetry["SIG_VEL_01"]["value"]
     temperature = telemetry["SIG_TMP_05"]["value"]
     soc = telemetry["SIG_SOC_06"]["value"]
@@ -323,6 +333,20 @@ def processing_worker():
 
 def main():
 
+    parser = argparse.ArgumentParser(
+        description="Конвеєр оброблення телеметрії електроскутера"
+    )
+
+    parser.add_argument(
+        "--measure",
+        action="store_true",
+        help="Увімкнути вимірювання продуктивності"
+    )
+
+    args = parser.parse_args()
+
+    measure_performance = args.measure
+
     client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2,
         client_id="scooter_stream_receiver"
@@ -337,6 +361,11 @@ def main():
     )
 
     print("Запуск конвеєра оброблення телеметрії...")
+
+    if measure_performance:
+        print("Режим: вимірювання продуктивності.")
+    else:
+        print("Режим: звичайна робота.")
 
     try:
         # Підключення до InfluxDB.
@@ -367,6 +396,10 @@ def main():
             keepalive=MQTT_KEEPALIVE
         )
 
+        # Початок вимірювання лише в спеціальному режимі.
+        if measure_performance:
+            performance_monitor.start()
+
         client.loop_forever()
 
     except KeyboardInterrupt:
@@ -383,6 +416,10 @@ def main():
 
         if worker.is_alive():
             worker.join()
+
+        # Завершення вимірювання після оброблення черги.
+        if measure_performance:
+            performance_monitor.stop()
 
         # Закриття з'єднання з InfluxDB.
         database_manager.close()
