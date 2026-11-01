@@ -5,3 +5,6 @@ __pycache__/
 # Log files
 *.log
 stream_receiver.log
+
+# Environment variables
+.env

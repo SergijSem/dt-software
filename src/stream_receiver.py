@@ -15,6 +15,7 @@ from missing_data_handler import MissingDataHandler
 from resampler import Resampler
 from state_manager import StateManager
 from state_synchronizer import StateSynchronizer
+from database_manager import database_manager
 
 
 # Параметри MQTT-брокера
@@ -229,6 +230,12 @@ def process_message(item):
         timestamp
     )
 
+    # Збереження прийнятого вимірювання в InfluxDB.
+    database_manager.write_telemetry(
+        data,
+        timestamp
+    )
+
     # Отримання актуального зрізу телеметрії.
     snapshot = missing_data_handler.get_snapshot(
         datetime.now(timezone.utc)
@@ -331,20 +338,29 @@ def main():
 
     print("Запуск конвеєра оброблення телеметрії...")
 
-    # Реєстрація підписників.
-    state_manager.subscribe(
-        "interface",
-        interface_subscriber
-    )
-
-    state_manager.subscribe(
-        "analytics",
-        analytics_subscriber
-    )
-
-    worker.start()
-
     try:
+        # Підключення до InfluxDB.
+        database_manager.connect()
+
+        # Реєстрація підписників.
+        state_manager.subscribe(
+            "interface",
+            interface_subscriber
+        )
+
+        state_manager.subscribe(
+            "analytics",
+            analytics_subscriber
+        )
+
+        # Реєстрація підписника бази даних.
+        state_manager.subscribe(
+            "database",
+            database_manager.write_twin_state
+        )
+
+        worker.start()
+
         client.connect(
             MQTT_HOST,
             MQTT_PORT,
@@ -357,14 +373,19 @@ def main():
         print("\nПриймання телеметрії зупинено.")
 
     except (OSError, ValueError) as error:
-        print(f"Помилка MQTT-з'єднання: {error}")
+        print(f"Помилка підключення: {error}")
 
     finally:
         if client.is_connected():
             client.disconnect()
 
         stop_event.set()
-        worker.join()
+
+        if worker.is_alive():
+            worker.join()
+
+        # Закриття з'єднання з InfluxDB.
+        database_manager.close()
 
         print("Конвеєр оброблення завершив роботу.")
 
