@@ -1,0 +1,15 @@
+{
+  "definition": "http://web/twin/running-gear-1.0.0.tm.jsonld",
+  "policyId": "org.pzks:scooter-policy",
+  "attributes": {
+    "name": "Ходова частина",
+    "partOf": "org.pzks:scooter-1"
+  },
+  "features": {
+    "state": {
+      "properties": {
+        "speed": 0
+      }
+    }
+  }
+}

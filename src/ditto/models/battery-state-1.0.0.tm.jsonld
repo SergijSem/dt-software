@@ -1,0 +1,43 @@
+{
+    "@context":  [
+                     "https://www.w3.org/2022/wot/td/v1.1",
+                     {
+                         "qudt":  "http://qudt.org/vocab/unit/",
+                         "scooter":  "http://example.org/scooter#"
+                     }
+                 ],
+    "@type":  "tm:ThingModel",
+    "title":  "Акумулятор — стан",
+    "version":  {
+                    "model":  "1.0.0"
+                },
+    "properties":  {
+                       "current":  {
+                                       "@type":  "scooter:BatteryCurrent",
+                                       "title":  "Струм акумулятора",
+                                       "type":  "number",
+                                       "unit":  "qudt:A",
+                                       "minimum":  0,
+                                       "maximum":  50,
+                                       "observable":  true
+                                   },
+                       "voltage":  {
+                                       "@type":  "scooter:BatteryVoltage",
+                                       "title":  "Напруга акумулятора",
+                                       "type":  "number",
+                                       "unit":  "qudt:V",
+                                       "minimum":  36,
+                                       "maximum":  54.6,
+                                       "observable":  true
+                                   },
+                       "stateOfCharge":  {
+                                             "@type":  "scooter:BatteryStateOfCharge",
+                                             "title":  "Рівень заряду акумулятора",
+                                             "type":  "number",
+                                             "unit":  "qudt:PERCENT",
+                                             "minimum":  0,
+                                             "maximum":  100,
+                                             "observable":  true
+                                         }
+                   }
+}

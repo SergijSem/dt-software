@@ -1,0 +1,16 @@
+{
+  "definition": "http://web/twin/motor-1.0.0.tm.jsonld",
+  "policyId": "org.pzks:scooter-policy",
+  "attributes": {
+    "name": "Електродвигун",
+    "partOf": "org.pzks:scooter-1"
+  },
+  "features": {
+    "state": {
+      "properties": {
+        "rpm": 0,
+        "temperature": 0
+      }
+    }
+  }
+}

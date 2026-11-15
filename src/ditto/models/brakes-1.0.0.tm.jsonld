@@ -1,0 +1,35 @@
+{
+    "@context":  [
+                     "https://www.w3.org/2022/wot/td/v1.1",
+                     {
+                         "qudt":  "http://qudt.org/vocab/unit/",
+                         "scooter":  "http://example.org/scooter#"
+                     }
+                 ],
+    "@type":  [
+                  "tm:ThingModel",
+                  "scooter:BrakingSystem"
+              ],
+    "title":  "Гальмівна система",
+    "version":  {
+                    "model":  "1.0.0"
+                },
+    "properties":  {
+                       "name":  {
+                                    "type":  "string",
+                                    "title":  "Назва підсистеми"
+                                },
+                       "partOf":  {
+                                      "type":  "string",
+                                      "title":  "Батьківський цифровий двійник"
+                                  }
+                   },
+    "links":  [
+                  {
+                      "rel":  "tm:submodel",
+                      "instanceName":  "state",
+                      "href":  "http://web/twin/brakes-state-1.0.0.tm.jsonld",
+                      "type":  "application/tm+json"
+                  }
+              ]
+}

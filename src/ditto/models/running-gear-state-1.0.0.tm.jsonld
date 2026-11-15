@@ -1,0 +1,25 @@
+{
+    "@context":  [
+                     "https://www.w3.org/2022/wot/td/v1.1",
+                     {
+                         "qudt":  "http://qudt.org/vocab/unit/",
+                         "scooter":  "http://example.org/scooter#"
+                     }
+                 ],
+    "@type":  "tm:ThingModel",
+    "title":  "Ходова частина — стан",
+    "version":  {
+                    "model":  "1.0.0"
+                },
+    "properties":  {
+                       "speed":  {
+                                     "@type":  "scooter:VehicleSpeed",
+                                     "title":  "Швидкість руху",
+                                     "type":  "number",
+                                     "unit":  "qudt:KiloM-PER-HR",
+                                     "minimum":  0,
+                                     "maximum":  60,
+                                     "observable":  true
+                                 }
+                   }
+}

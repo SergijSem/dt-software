@@ -1,0 +1,25 @@
+{
+  "@context": [
+    "https://www.w3.org/2022/wot/td/v1.1",
+    {
+      "scooter": "http://example.org/scooter#"
+    }
+  ],
+  "@type": "tm:ThingModel",
+  "title": "Відомості синхронізації",
+  "version": {
+    "model": "1.0.0"
+  },
+  "properties": {
+    "seq": {
+      "title": "Номер повідомлення",
+      "type": "integer",
+      "minimum": 0
+    },
+    "ts": {
+      "title": "Час відліку на джерелі, мс від 1970-01-01 UTC",
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

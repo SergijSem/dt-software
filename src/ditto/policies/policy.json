@@ -1,0 +1,38 @@
+{
+  "entries": {
+    "OWNER": {
+      "subjects": {
+        "nginx:ditto": {
+          "type": "оператор платформи"
+        }
+      },
+      "resources": {
+        "thing:/": {
+          "grant": ["READ", "WRITE"],
+          "revoke": []
+        },
+        "policy:/": {
+          "grant": ["READ", "WRITE"],
+          "revoke": []
+        },
+        "message:/": {
+          "grant": ["READ", "WRITE"],
+          "revoke": []
+        }
+      }
+    },
+    "TELEMETRY": {
+      "subjects": {
+        "integration:telemetry": {
+          "type": "з'єднання MQTT"
+        }
+      },
+      "resources": {
+        "thing:/features": {
+          "grant": ["WRITE"],
+          "revoke": []
+        }
+      }
+    }
+  }
+}

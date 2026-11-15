@@ -1,0 +1,23 @@
+{
+  "definition": "http://web/twin/scooter-unit-1.0.0.tm.jsonld",
+  "policyId": "org.pzks:scooter-policy",
+  "attributes": {
+    "manufacturer": "Generic",
+    "serialNo": "SCOOTER-001",
+    "hasPart": [
+      "org.pzks:motor-1",
+      "org.pzks:battery-1",
+      "org.pzks:running-gear-1",
+      "org.pzks:brakes-1",
+      "org.pzks:security-1"
+    ]
+  },
+  "features": {
+    "sync": {
+      "properties": {
+        "seq": 0,
+        "ts": 0
+      }
+    }
+  }
+}

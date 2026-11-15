@@ -1,0 +1,44 @@
+{
+    "@context":  [
+                     "https://www.w3.org/2022/wot/td/v1.1",
+                     {
+                         "qudt":  "http://qudt.org/vocab/unit/",
+                         "scooter":  "http://example.org/scooter#"
+                     }
+                 ],
+    "@type":  [
+                  "tm:ThingModel",
+                  "scooter:ScooterUnit"
+              ],
+    "title":  "Електроскутер",
+    "version":  {
+                    "model":  "1.0.0"
+                },
+    "links": [
+        {
+            "rel": "tm:submodel",
+            "instanceName": "sync",
+            "href": "http://web/twin/sync-1.0.0.tm.jsonld",
+            "type": "application/tm+json"
+        }
+    ],
+    "properties":  {
+                       "manufacturer":  {
+                                            "title":  "Виробник",
+                                            "type":  "string",
+                                            "readOnly":  true
+                                        },
+                       "serialNo":  {
+                                        "title":  "Заводський номер",
+                                        "type":  "string",
+                                        "readOnly":  true
+                                    },
+                       "hasPart":  {
+                                       "title":  "Складові електроскутера",
+                                       "items":  {
+                                                     "type":  "string"
+                                                 },
+                                       "type":  "array"
+                                   }
+                   }
+}

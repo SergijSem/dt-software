@@ -8,3 +8,5 @@ stream_receiver.log
 
 # Environment variables
 .env
+# Eclipse Ditto source code
+platform/ditto/

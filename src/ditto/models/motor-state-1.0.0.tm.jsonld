@@ -1,0 +1,34 @@
+{
+    "@context":  [
+                     "https://www.w3.org/2022/wot/td/v1.1",
+                     {
+                         "qudt":  "http://qudt.org/vocab/unit/",
+                         "scooter":  "http://example.org/scooter#"
+                     }
+                 ],
+    "@type":  "tm:ThingModel",
+    "title":  "Електродвигун — стан",
+    "version":  {
+                    "model":  "1.0.0"
+                },
+    "properties":  {
+                       "rpm":  {
+                                   "@type":  "scooter:MotorSpeed",
+                                   "title":  "Частота обертання двигуна",
+                                   "type":  "number",
+                                   "unit":  "qudt:REV-PER-MIN",
+                                   "minimum":  0,
+                                   "maximum":  3000,
+                                   "observable":  true
+                               },
+                       "temperature":  {
+                                           "@type":  "scooter:MotorTemperature",
+                                           "title":  "Температура електродвигуна",
+                                           "type":  "number",
+                                           "unit":  "qudt:DEG_C",
+                                           "minimum":  -20,
+                                           "maximum":  120,
+                                           "observable":  true
+                                       }
+                   }
+}

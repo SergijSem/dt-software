@@ -1,0 +1,22 @@
+{
+    "@context":  [
+                     "https://www.w3.org/2022/wot/td/v1.1",
+                     {
+                         "qudt":  "http://qudt.org/vocab/unit/",
+                         "scooter":  "http://example.org/scooter#"
+                     }
+                 ],
+    "@type":  "tm:ThingModel",
+    "title":  "Гальмівна система — стан",
+    "version":  {
+                    "model":  "1.0.0"
+                },
+    "properties":  {
+                       "active":  {
+                                      "@type":  "scooter:BrakingState",
+                                      "title":  "Стан гальмування",
+                                      "type":  "boolean",
+                                      "observable":  true
+                                  }
+                   }
+}
