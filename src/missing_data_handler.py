@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 
+
 class MissingDataHandler:
     """Утримання останніх значень та контроль їх актуальності."""
 
     FRESHNESS_LIMITS = {
-        "SIG_VEL_01": 0.5,
-        "SIG_RPM_02": 0.5,
+        "SIG_VEL_01": 2.0,
+        "SIG_RPM_02": 2.0,
         "SIG_CUR_03": 3.0,
         "SIG_VOL_04": 3.0,
         "SIG_TMP_05": 30.0,
@@ -56,9 +57,7 @@ class MissingDataHandler:
             if sensor_id in self.EVENT_SENSORS:
                 valid = True
             else:
-                valid = (
-                    age <= self.FRESHNESS_LIMITS[sensor_id]
-                )
+                valid = age <= self.FRESHNESS_LIMITS[sensor_id]
 
             snapshot[sensor_id] = {
                 "value": item["value"],

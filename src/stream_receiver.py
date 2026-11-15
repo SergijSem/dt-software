@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import json
 import logging
 import queue
@@ -18,6 +18,7 @@ from state_manager import StateManager
 from state_synchronizer import StateSynchronizer
 from database_manager import database_manager
 from performance_monitor import PerformanceMonitor
+from ditto_adapter import DittoAdapter
 
 
 # Параметри MQTT-брокера
@@ -387,9 +388,15 @@ def main():
           else "Режим: звичайна робота.", flush=True)
     print(f"Тривалість роботи: {args.duration:.1f} с", flush=True)
 
+    ditto_adapter = None
+
     try:
         # Підключення до InfluxDB.
         database_manager.connect()
+
+        # Запуск адаптера Eclipse Ditto.
+        ditto_adapter = DittoAdapter()
+        ditto_adapter.start()
 
         # Реєстрація підписників.
         state_manager.subscribe(
@@ -408,6 +415,14 @@ def main():
             database_manager.write_twin_state
         )
 
+        # Реєстрація підписника Eclipse Ditto.
+        state_manager.subscribe(
+            "ditto",
+            ditto_adapter.on_state_update
+        )
+
+
+        
         worker.start()
 
         client.connect(
@@ -458,6 +473,10 @@ def main():
 
         if worker.is_alive():
             worker.join()
+
+        # Завершення адаптера Eclipse Ditto.
+        if ditto_adapter is not None:
+            ditto_adapter.close()
 
         # Завершення вимірювання після оброблення черги.
         performance_results = None
